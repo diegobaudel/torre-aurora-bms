@@ -1,0 +1,14 @@
+{
+  "name": "torre-aurora-simulador",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "humo": "node index.js --humo p3z2"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mqtt": "^5.10.1"
+  }
+}

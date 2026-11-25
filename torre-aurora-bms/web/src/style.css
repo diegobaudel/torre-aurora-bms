@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+@utility card { @apply bg-white rounded-xl shadow-sm border border-slate-200 p-4; }
+@utility btn-primary { @apply px-4 py-2 rounded-lg font-medium transition bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50; }
+@utility input { @apply w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500; }
