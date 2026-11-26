@@ -26,7 +26,11 @@ const db = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   : null
 const acumulado = {}   // { piso: { temps: [], kwh: 0, luz: 0 } }
 
-const cliente = mqtt.connect(BROKER, { clientId: `sim-${P}-${Math.random().toString(16).slice(2, 8)}` })
+const cliente = mqtt.connect(BROKER, {
+  clientId: `sim-${P}-${Math.random().toString(16).slice(2, 8)}`,
+  // Si el proceso muere sin avisar (se cierra la terminal), el broker publica que quedó fuera de línea
+  will: { topic: `${P}/sim/estado`, payload: JSON.stringify({ online: false }), retain: true, qos: 1 },
+})
 
 const pub = (topico, valor, retain = false) =>
   cliente.publish(`${P}/${topico}`, typeof valor === 'string' ? valor : JSON.stringify(valor), { retain })

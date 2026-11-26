@@ -25,20 +25,25 @@ onMounted(async () => {
 const piso = ref(null)          // null = todos los pisos
 const ventana = ref(5)          // minutos
 const pestana = ref('temp')
-const VENTANAS = [1, 5, 10]
+const VENTANAS = [1, 5, 10, 24 * 60]  // minutos; 24 h sale de la base
 const COLORES = { 5: '#9aaeb9', 4: '#7b61d1', 3: '#f0a030', 2: '#0099cc', 1: '#00c99c' }
 const pisosVista = computed(() => (piso.value ? [piso.value] : PISOS))
+const hayVivo = computed(() => edificio.historia.horas.length > 1)
+// Sin lecturas en vivo o con la ventana de 24 h se usa el historial guardado en Supabase
+const historico = computed(() => ventana.value === 24 * 60 || !hayVivo.value)
+const fuente = computed(() => (historico.value ? edificio.historial24 : edificio.historia))
 const puntosVentana = computed(() => ventana.value * 12)   // lecturas cada 5 s
-const recorte = (arr = []) => arr.slice(-puntosVentana.value)
+const recorte = (arr = []) => (historico.value ? arr : arr.slice(-puntosVentana.value))
+const etiquetaVentana = computed(() => (historico.value ? 'últimas 24 h (guardado)' : `últimos ${ventana.value} min`))
 
 // ---------- Series ----------
 const serieTemp = computed(() => {
-  const series = pisosVista.value.map((p) => recorte(edificio.historia.temp[p]))
+  const series = pisosVista.value.map((p) => recorte(fuente.value.temp[p]))
   const n = Math.min(...series.map((s) => s.length))
   return Array.from({ length: n }, (_, i) => promedio(series.map((s) => s[s.length - n + i])))
 })
 const serieConsumo = computed(() => {
-  const series = pisosVista.value.map((p) => recorte(edificio.historia.energia[p]))
+  const series = pisosVista.value.map((p) => recorte(fuente.value.energia[p]))
   const n = Math.min(...series.map((s) => s.length))
   return Array.from({ length: n }, (_, i) => series.reduce((a, s) => a + s[s.length - n + i], 0))
 })
@@ -65,6 +70,7 @@ const resumen = computed(() => {
   const partes = totalE ? Math.round((Number(edificio.energia[ranking[0]] ?? 0) / totalE) * 100) : 0
   return {
     donde: piso.value ? `el piso ${piso.value}` : 'la torre',
+    guardado: !edificio.simuladorOnline && edificio.historial24.ultima,
     temp: tempActual.value.toFixed(1),
     consumo: consumoActual.value?.toFixed(1),
     luces: `${lucesOn.value} de ${zonasVista.value.length}`,
@@ -82,10 +88,10 @@ const ranking = computed(() => {
 })
 
 // ---------- Gráfica ----------
-const etiquetas = computed(() => recorte(edificio.historia.horas))
+const etiquetas = computed(() => recorte(fuente.value.horas))
 const seriesGrafica = computed(() => {
   if (pestana.value === 'temp') {
-    return pisosVista.value.slice().reverse().map((p) => ({ nombre: `Piso ${p}`, datos: recorte(edificio.historia.temp[p]), color: COLORES[p] }))
+    return pisosVista.value.slice().reverse().map((p) => ({ nombre: `Piso ${p}`, datos: recorte(fuente.value.temp[p]), color: COLORES[p] }))
   }
   return [{ nombre: piso.value ? `Piso ${piso.value}` : 'Edificio completo', datos: serieConsumo.value, color: '#0099cc', relleno: true }]
 })
@@ -95,11 +101,12 @@ const zonasPiso = computed(() => (piso.value ? porPiso.value[piso.value] ?? [] :
 
 // ---------- Exportar CSV ----------
 function exportarCSV() {
-  const horas = edificio.historia.horas
+  const f = fuente.value
+  const horas = f.horas
   const filas = [['hora', ...PISOS.flatMap((p) => [`temp_p${p}_c`, `energia_p${p}_kwh`])]]
   horas.forEach((h, i) => {
     const off = (s = []) => s[s.length - horas.length + i] ?? ''
-    filas.push([h, ...PISOS.flatMap((p) => [off(edificio.historia.temp[p]), off(edificio.historia.energia[p])])])
+    filas.push([h, ...PISOS.flatMap((p) => [off(f.temp[p]), off(f.energia[p])])])
   })
   const blob = new Blob([filas.map((f) => f.join(',')).join('\n')], { type: 'text/csv;charset=utf-8' })
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `torre-aurora-lecturas-${Date.now()}.csv` })
@@ -133,7 +140,7 @@ const subsistemas = computed(() => [
         <span class="text-sm text-grafito mr-1">Ventana</span>
         <div class="flex rounded-md border border-losa overflow-hidden" role="group" aria-label="Ventana de tiempo">
           <button v-for="v in VENTANAS" :key="v" type="button" @click="ventana = v" :aria-pressed="ventana === v"
-            class="px-3 py-1 text-sm transition" :class="ventana === v ? 'bg-cian/10 text-cian font-medium' : 'hover:bg-fondo'">{{ v }} min</button>
+            class="px-3 py-1 text-sm transition" :class="(historico ? v === 24 * 60 : ventana === v) ? 'bg-cian/10 text-cian font-medium' : 'hover:bg-fondo'">{{ v === 24 * 60 ? '24 h' : `${v} min` }}</button>
         </div>
       </div>
       <div class="flex items-center gap-2 sm:ml-auto">
@@ -141,7 +148,7 @@ const subsistemas = computed(() => [
           <span class="h-2 w-2 rounded-full" :class="edificio.pausado ? 'bg-calor' : 'bg-menta latido'" />
           {{ edificio.pausado ? 'Gráficas en pausa' : 'En vivo' }}
         </button>
-        <button type="button" class="btn-ghost" :disabled="!edificio.historia.horas.length" @click="exportarCSV">
+        <button type="button" class="btn-ghost" :disabled="!fuente.horas.length" @click="exportarCSV">
           <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3h16v-3" /></svg>
           Exportar CSV
         </button>
@@ -150,21 +157,21 @@ const subsistemas = computed(() => [
 
     <!-- Resumen en texto -->
     <p v-if="resumen" class="panel px-5 py-4 text-[15px] leading-relaxed border-l-4 !border-l-menta" aria-live="polite">
-      Ahora mismo {{ resumen.donde }} está a <strong class="tabular-nums" :style="{ color: colorTemp(resumen.temp) }">{{ resumen.temp }} °C</strong>
+      <template v-if="resumen.guardado">Según la última lectura guardada ({{ resumen.guardado.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false }) }}), </template><template v-else>Ahora mismo </template>{{ resumen.donde }} está a <strong class="tabular-nums" :style="{ color: colorTemp(resumen.temp) }">{{ resumen.temp }} °C</strong>
       en promedio, consume <strong class="tabular-nums">{{ resumen.consumo }} kWh</strong> y tiene <strong>{{ resumen.luces }}</strong> zonas iluminadas.
       <template v-if="resumen.caliente">El piso más cálido es el <strong>{{ resumen.caliente.p }}</strong> ({{ resumen.caliente.t.toFixed(1) }} °C)
         y el <strong>{{ resumen.mayor.p }}</strong> concentra el <strong>{{ resumen.mayor.partes }} %</strong> del consumo.</template>
       <strong v-if="resumen.alarmas" class="text-alarma"> Hay {{ resumen.alarmas }} alarma(s) de humo sin atender.</strong>
       <template v-else> Sin alarmas activas.</template>
     </p>
-    <p v-else class="panel px-5 py-4 text-sm border-l-4 !border-l-calor">
-      No llegan lecturas de los sensores. Inicia el simulador con <code class="px-1 rounded bg-fondo">npm start</code> en la carpeta <code class="px-1 rounded bg-fondo">simulador</code>.
+    <p v-if="!edificio.simuladorOnline" class="panel px-5 py-3 text-sm border-l-4 !border-l-calor">
+      Sin lecturas en vivo: se muestra el historial guardado. Para datos en tiempo real inicia el simulador con <code class="px-1 rounded bg-fondo">npm start</code> en la carpeta <code class="px-1 rounded bg-fondo">simulador</code>.
     </p>
 
     <!-- Indicadores -->
     <section class="grid gap-4 grid-cols-2 xl:grid-cols-4" aria-label="Indicadores">
       <KpiTile titulo="Temperatura promedio" :valor="tempActual" unidad="°C" :serie="serieTemp" :delta="delta(serieTemp)"
-        :color="colorTemp(tempActual)" :nota="`Cambio en los últimos ${ventana} min`" />
+        :color="colorTemp(tempActual)" :nota="`Cambio en ${etiquetaVentana}`" />
       <KpiTile titulo="Consumo eléctrico" :valor="consumoActual" unidad="kWh" :serie="serieConsumo" :delta="delta(serieConsumo)"
         invertir-delta color="#0099cc" :nota="piso ? `Piso ${piso}` : 'Suma de los 5 pisos'" />
       <KpiTile titulo="Zonas iluminadas" :valor="zonasVista.length ? lucesOn : null" :decimales="0" :sufijo="`/${zonasVista.length}`"
@@ -235,7 +242,7 @@ const subsistemas = computed(() => [
                 role="tab" :aria-selected="pestana === t.id" @click="pestana = t.id"
                 class="px-3 py-1 rounded text-sm transition" :class="pestana === t.id ? 'bg-superficie shadow-sm font-medium' : 'text-grafito'">{{ t.txt }}</button>
             </div>
-            <span class="text-xs text-grafito">{{ piso ? `Piso ${piso}` : 'Todos los pisos' }}, últimos {{ ventana }} min</span>
+            <span class="text-xs text-grafito">{{ piso ? `Piso ${piso}` : 'Todos los pisos' }}, {{ etiquetaVentana }}</span>
           </div>
           <TrendChart v-if="etiquetas.length > 1" :etiquetas="etiquetas" :series="seriesGrafica"
             :unidad="pestana === 'temp' ? '°C' : 'kWh'" :alto="piso ? 220 : 300" />

@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from './stores/auth'
-import { conectarMqtt, desconectarMqtt } from './lib/mqtt'
+import { conectarMqtt, desconectarMqtt, cargarHistorial } from './lib/mqtt'
 import Sidebar from './components/Sidebar.vue'
 import TopBar from './components/TopBar.vue'
 
@@ -12,7 +12,7 @@ const menu = ref(false)
 
 // Conecta MQTT solo con sesión; si la sesión se cierra, vuelve al login
 watch(() => auth.usuario, (u) => {
-  if (u) conectarMqtt()
+  if (u) { conectarMqtt(); cargarHistorial() }
   else { desconectarMqtt(); router.push('/login') }
 }, { immediate: true })
 </script>
