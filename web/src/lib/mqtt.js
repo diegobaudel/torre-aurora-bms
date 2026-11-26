@@ -79,7 +79,7 @@ export function procesar(topico, v) {
     const piso = id.slice(1)
     edificio.energia[piso] = v
     if (!edificio.pausado) empujar(edificio.historia.energia, piso, v)
-  } else if (sub === 'humo') {
+  } else if (sub === 'humo' && !accion) {
     if (!edificio.humo[id]) {
       agregarEvento('alarma', `Humo detectado en ${etiquetaZona(id)}`)
       edificio.humo[id] = new Date().toISOString()

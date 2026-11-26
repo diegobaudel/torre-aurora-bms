@@ -40,6 +40,8 @@ cliente.on('connect', () => {
   // Comandos desde la web
   cliente.subscribe(`${P}/+/luz/set`)
   cliente.subscribe(`${P}/+/hvac/set`)
+  cliente.subscribe(`${P}/+/hvac/objetivo`)   // recupera objetivos retenidos al reiniciar (HU-08)
+  cliente.subscribe(`${P}/+/humo/simular`)    // prueba de detector desde la web (HU-15)
   // Estado inicial (retained: la web lo recibe al conectarse)
   for (const [zona, estado] of Object.entries(luces)) pub(`${zona}/luz/estado`, estado, true)
   pub('sim/estado', { online: true, desde: new Date().toISOString() }, true)
@@ -57,6 +59,21 @@ cliente.on('message', (topico, buf) => {
       pub(`${id}/luz/estado`, valor, true)
       console.log(`Luz ${id} -> ${valor}`)
     }, 300)
+  }
+
+  if (partes[2] === 'hvac' && partes[3] === 'objetivo') {
+    const piso = Number(id.replace('p', ''))
+    const t = Number(valor)
+    if (objetivo[piso] !== undefined && t >= 18 && t <= 28 && objetivo[piso] !== t) {
+      objetivo[piso] = t
+      console.log(`HVAC piso ${piso}: objetivo recuperado ${t} °C`)
+    }
+    return
+  }
+
+  if (partes[2] === 'humo' && partes[3] === 'simular') {
+    dispararHumo(id)
+    return
   }
 
   if (partes[2] === 'hvac') {
@@ -87,7 +104,30 @@ setInterval(() => {
   }
 }, INTERVALO)
 
+// Al arrancar, toma los objetivos guardados en la base (HU-08)
+async function cargarObjetivos() {
+  if (!db) return
+  const { data, error } = await db.from('hvac_config').select('piso, objetivo')
+  if (error) return console.error('No se pudieron leer los objetivos:', error.message)
+  for (const c of data ?? []) objetivo[c.piso] = Number(c.objetivo)
+  console.log('Objetivos de temperatura cargados de la base')
+}
+cargarObjetivos()
+
+// Detección de humo: publica la alarma y la registra en la base al momento (HU-15)
+async function dispararHumo(zona) {
+  if (!/^p\d+z\d+$/.test(zona)) return
+  pub(`${zona}/humo`, 'alarma')
+  console.log(`¡Humo detectado en ${zona}!`)
+  if (!db) return
+  const { data: z } = await db.from('zonas').select('id').eq('clave', zona).single()
+  if (!z) return
+  const { error } = await db.from('alarmas').insert({ zona_id: z.id, tipo: 'humo' })
+  if (error) console.error('No se pudo registrar la alarma:', error.message)
+}
+
 // Cada minuto guarda un resumen por piso en la tabla lecturas
+if (!db) console.log('Sin SUPABASE_SERVICE_ROLE_KEY: no se guardan lecturas ni alarmas en la base (ver .env.example)')
 if (db) {
   console.log('Guardando lecturas en Supabase cada minuto')
   setInterval(async () => {
@@ -113,7 +153,7 @@ if (db) {
 const iHumo = process.argv.indexOf('--humo')
 if (iHumo > -1) {
   const zona = process.argv[iHumo + 1] ?? 'p1z1'
-  setTimeout(() => { pub(`${zona}/humo`, 'alarma'); console.log(`¡Humo simulado en ${zona}!`) }, 3000)
+  setTimeout(() => dispararHumo(zona), 3000)
 }
 
 process.on('SIGINT', () => { pub('sim/estado', { online: false }, true); cliente.end(false, () => process.exit(0)) })
