@@ -1,5 +1,56 @@
 @import "tailwindcss";
 
-@utility card { @apply bg-white rounded-xl shadow-sm border border-slate-200 p-4; }
-@utility btn-primary { @apply px-4 py-2 rounded-lg font-medium transition bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50; }
-@utility input { @apply w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500; }
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Paleta Torre Aurora: tomada del imaginario Desigo (vidrio, cian y menta sobre blanco) */
+@theme {
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+
+  --color-fondo: #f4f7f9;       /* fondo general */
+  --color-superficie: #ffffff;  /* paneles */
+  --color-losa: #e1e7eb;        /* bordes y separadores */
+  --color-tinta: #1f2a30;       /* texto principal */
+  --color-grafito: #5f6e77;     /* texto secundario */
+  --color-cian: #0099cc;        /* acción principal */
+  --color-menta: #00c99c;       /* en vivo, estado normal, luz encendida */
+  --color-vidrio: #8fcbe9;      /* fachada de vidrio, luz apagada */
+  --color-estructura: #3e4c55;  /* marcos de la torre */
+  --color-alarma: #e5484d;      /* alarmas */
+  --color-calor: #f0a030;       /* temperatura alta */
+  --color-frio: #3d7bd6;        /* temperatura baja */
+}
+
+.dark {
+  --color-fondo: #0e181e;
+  --color-superficie: #15232b;
+  --color-losa: #243640;
+  --color-tinta: #e4edf1;
+  --color-grafito: #93a4ae;
+  --color-vidrio: #2a5770;
+  --color-estructura: #0a1318;
+}
+
+html { font-feature-settings: "tnum" 1; }
+body { @apply bg-fondo text-tinta antialiased transition-colors; }
+
+@utility panel { @apply bg-superficie rounded-lg border border-losa; }
+@utility btn-primary {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium text-white bg-cian
+         hover:brightness-110 disabled:opacity-50 transition;
+}
+@utility btn-ghost {
+  @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm border border-losa bg-superficie
+         hover:border-cian hover:text-cian transition;
+}
+@utility input {
+  @apply w-full border border-losa rounded-md px-3 py-2 bg-superficie text-tinta
+         focus:outline-none focus:ring-2 focus:ring-cian/40 focus:border-cian;
+}
+
+:focus-visible { outline: 2px solid var(--color-cian); outline-offset: 2px; }
+
+@keyframes pulso { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+.pulso { animation: pulso 1.2s ease-in-out infinite; }
+@keyframes latido { 0% { box-shadow: 0 0 0 0 rgb(0 201 156 / .55) } 100% { box-shadow: 0 0 0 7px rgb(0 201 156 / 0) } }
+.latido { animation: latido 1.6s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .pulso, .latido { animation: none; } }
