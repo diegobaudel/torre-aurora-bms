@@ -27,7 +27,7 @@ docs/       Diagramas y capturas
 
 ### 1. Supabase (una sola vez, lo hace una persona)
 1. Crear proyecto en https://supabase.com.
-2. **SQL Editor** → pegar y ejecutar `supabase/migrations/001_init.sql`.
+2. **SQL Editor** → pegar y ejecutar `supabase/migrations/001_init.sql` y luego `supabase/migrations/002_sprint2.sql` (tablas del Sprint 2 y ~11 mil registros de prueba; se puede volver a correr para regenerar los datos).
 3. **Authentication → Providers → Email**: desactivar "Allow new users to sign up" (los usuarios los crea el admin desde la app).
 4. **Authentication → Users → Add user**: crear el primer usuario (marcar "Auto confirm"). Luego en SQL Editor:
    ```sql
@@ -49,6 +49,7 @@ npm install
 npm start            # lecturas cada 5 s
 npm run humo         # además dispara una alarma de humo en p3z2
 ```
+Opcional: con `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` en `simulador/.env`, el simulador guarda una lectura por minuto en la tabla `lecturas` y las gráficas de Energía crecen con datos reales. Esa llave es secreta: solo va en el `.env` del simulador, nunca en el front ni en el repo.
 
 ### 3. Web
 ```bash
@@ -80,6 +81,10 @@ npm run dev            # http://localhost:5173
 | `zonas` | 5 pisos × 2 zonas; `clave` se usa en los tópicos (`p3z2`) |
 | `dispositivos` | sensores y actuadores por zona y subsistema |
 | `bitacora_iluminacion` | quién encendió/apagó qué zona y cuándo (HU-10) |
+| `lecturas` | temperatura y consumo por piso y subsistema (HU-07, HU-13) |
+| `hvac_config`, `bitacora_hvac` | temperatura objetivo por piso y quién la cambió (HU-08) |
+| `alarmas` | humo e intrusión: detección, atención, quién y nota (HU-15) |
+| `credenciales`, `credencial_zonas`, `accesos` | tarjetas, zonas permitidas e intentos de acceso (HU-05) |
 
 ## Historias del Sprint 1 y dónde están
 
@@ -90,6 +95,16 @@ npm run dev            # http://localhost:5173
 | TAB-21 HU-03 Dashboard | `web/src/views/Dashboard.vue` |
 | TAB-22 HU-10 Iluminación | `web/src/views/Iluminacion.vue` |
 | TAB-6 T-01 Simulador | `simulador/index.js` |
+
+## Historias del Sprint 2
+
+| Historia | Archivos |
+|---|---|
+| TAB-24 HU-07 Temperatura por piso | `web/src/views/Climatizacion.vue` |
+| TAB-25 HU-08 Temperatura objetivo | `web/src/views/Climatizacion.vue` |
+| TAB-26 HU-13 Consumo eléctrico | `web/src/views/Energia.vue`, funciones `consumo_serie` y `consumo_resumen` |
+| TAB-27 HU-15 Alerta de humo | `web/src/views/Seguridad.vue`, `web/src/lib/useAlarmas.js` |
+| TAB-23 HU-05 Acceso por credencial | `web/src/views/Accesos.vue` |
 
 ## Forma de trabajo
 

@@ -2,6 +2,7 @@
 // Publica lecturas por MQTT y responde a los comandos de iluminación.
 import 'dotenv/config'
 import mqtt from 'mqtt'
+import { createClient } from '@supabase/supabase-js'
 
 const BROKER = process.env.MQTT_URL ?? 'mqtt://broker.hivemq.com:1883'
 const P = process.env.MQTT_PREFIX ?? 'torre-aurora-e5'
@@ -18,6 +19,12 @@ for (let p = 1; p <= PISOS; p++) {
   objetivo[p] = 23
   for (let z = 1; z <= ZONAS_POR_PISO; z++) luces[`p${p}z${z}`] = Math.random() > 0.5 ? 'on' : 'off'
 }
+
+// Guardado opcional en Supabase (necesita la service role key, nunca la pongas en el front)
+const db = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  : null
+const acumulado = {}   // { piso: { temps: [], kwh: 0, luz: 0 } }
 
 const cliente = mqtt.connect(BROKER, { clientId: `sim-${P}-${Math.random().toString(16).slice(2, 8)}` })
 
@@ -70,8 +77,33 @@ setInterval(() => {
     const lucesOn = Object.entries(luces).filter(([k, v]) => k.startsWith(`p${p}z`) && v === 'on').length
     const kwh = 2 + lucesOn * 0.8 + Math.random()
     pub(`p${p}/energia`, kwh.toFixed(2))
+
+    const a = (acumulado[p] ??= { temps: [], kwh: 0, luz: 0 })
+    a.temps.push(temp[p]); a.kwh += kwh; a.luz += lucesOn * 0.8
   }
 }, INTERVALO)
+
+// Cada minuto guarda un resumen por piso en la tabla lecturas
+if (db) {
+  console.log('Guardando lecturas en Supabase cada minuto')
+  setInterval(async () => {
+    const filas = Object.entries(acumulado).map(([piso, a]) => {
+      const resto = Math.max(a.kwh - a.luz, 0)
+      return {
+        piso: Number(piso),
+        temp: Number((a.temps.reduce((x, y) => x + y, 0) / a.temps.length).toFixed(1)),
+        energia_total: Number(a.kwh.toFixed(2)),
+        energia_iluminacion: Number(a.luz.toFixed(2)),
+        energia_hvac: Number((resto * 0.6).toFixed(2)),
+        energia_otros: Number((resto * 0.4).toFixed(2)),
+      }
+    })
+    for (const k of Object.keys(acumulado)) delete acumulado[k]
+    if (!filas.length) return
+    const { error } = await db.from('lecturas').insert(filas)
+    if (error) console.error('No se pudieron guardar las lecturas:', error.message)
+  }, 60000)
+}
 
 // Prueba de alarma de humo (HU-15, Sprint 2): node index.js --humo p3z2
 const iHumo = process.argv.indexOf('--humo')

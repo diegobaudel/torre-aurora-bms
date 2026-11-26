@@ -16,6 +16,7 @@ const props = defineProps({
   serie: { type: Array, default: () => [] },
   color: { type: String, default: '#0099cc' },
   alerta: Boolean,
+  sinValor: Boolean,  // oculta el número grande (cuando el visual lo dice todo)
 })
 
 const animado = useTween(() => props.valor)
@@ -51,7 +52,7 @@ const idGrad = `g${Math.random().toString(36).slice(2, 8)}`
         {{ deltaInfo.flecha }} {{ deltaInfo.txt }}
       </span>
     </div>
-    <p class="mt-1 flex items-baseline gap-1">
+    <p v-if="!sinValor" class="mt-1 flex items-baseline gap-1">
       <span class="text-3xl font-semibold tracking-tight tabular-nums [font-stretch:85%]" :class="alerta ? 'text-alarma' : ''">
         {{ texto }}<span v-if="sufijo && valor !== null" class="text-grafito text-xl">{{ sufijo }}</span>
       </span>

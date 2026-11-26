@@ -1,6 +1,7 @@
 <script setup>
 // HU-03 Vista general viva: filtros, resumen dinámico, indicadores, torre, tendencias y ranking
 import { ref, computed, onMounted } from 'vue'
+import { supabase } from '../lib/supabase'
 import { edificio, PISOS, etiquetaZona } from '../lib/mqtt'
 import { useIluminacion } from '../lib/useIluminacion'
 import { promedio, hora, colorTemp } from '../lib/formato'
@@ -9,14 +10,23 @@ import KpiTile from '../components/KpiTile.vue'
 import TrendChart from '../components/TrendChart.vue'
 
 const { zonas, porPiso, pendientes, puedeControlar, cargarZonas, cambiar } = useIluminacion()
-onMounted(() => cargarZonas())
+const accesosHoy = ref(null)
+onMounted(async () => {
+  cargarZonas()
+  const inicio = new Date(); inicio.setHours(0, 0, 0, 0)
+  const [t, r] = await Promise.all([
+    supabase.from('accesos').select('id', { count: 'exact', head: true }).gte('fecha', inicio.toISOString()),
+    supabase.from('accesos').select('id', { count: 'exact', head: true }).gte('fecha', inicio.toISOString()).eq('permitido', false),
+  ])
+  if (!t.error) accesosHoy.value = { total: t.count ?? 0, rechazados: r.count ?? 0 }
+})
 
 // ---------- Filtros ----------
 const piso = ref(null)          // null = todos los pisos
 const ventana = ref(5)          // minutos
 const pestana = ref('temp')
 const VENTANAS = [1, 5, 10]
-const COLORES = { 5: '#1f2a30', 4: '#7b61d1', 3: '#f0a030', 2: '#0099cc', 1: '#00c99c' }
+const COLORES = { 5: '#9aaeb9', 4: '#7b61d1', 3: '#f0a030', 2: '#0099cc', 1: '#00c99c' }
 const pisosVista = computed(() => (piso.value ? [piso.value] : PISOS))
 const puntosVentana = computed(() => ventana.value * 12)   // lecturas cada 5 s
 const recorte = (arr = []) => arr.slice(-puntosVentana.value)
@@ -102,7 +112,7 @@ const subsistemas = computed(() => [
   { nombre: 'Climatización', estado: tempActual.value !== null ? `${tempActual.value.toFixed(1)} °C promedio` : 'Sin datos', ok: tempActual.value === null || (tempActual.value >= 18 && tempActual.value <= 28) },
   { nombre: 'Energía', estado: consumoActual.value !== null ? `${consumoActual.value.toFixed(1)} kWh ahora` : 'Sin datos', ok: true },
   { nombre: 'Seguridad', estado: alarmasVista.value.length ? `${alarmasVista.value.length} alarma(s) de humo` : 'Sin alarmas', ok: !alarmasVista.value.length },
-  { nombre: 'Accesos', estado: 'Se integra en el Sprint 2', ok: null },
+  { nombre: 'Accesos', estado: accesosHoy.value ? `${accesosHoy.value.total} hoy, ${accesosHoy.value.rechazados} rechazados` : 'Sin datos', ok: accesosHoy.value ? true : null },
 ])
 </script>
 

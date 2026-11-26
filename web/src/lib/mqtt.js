@@ -16,7 +16,7 @@ export const edificio = reactive({
   temp: {},       // { 1: '23.1' }
   objetivo: {},   // { 1: '23' }
   energia: {},    // { 1: '3.40' }
-  humo: {},       // { p3z2: 'alarma' }
+  humo: {},       // { p3z2: '2026-11-25T20:00:00Z' } hora de detección
   historia: { temp: {}, energia: {}, horas: [] }, // series para las gráficas
   pausado: false, // congela las gráficas sin cortar la conexión
   eventos: [],    // [{ tipo, texto, fecha }]
@@ -74,8 +74,10 @@ export function procesar(topico, v) {
     edificio.energia[piso] = v
     if (!edificio.pausado) empujar(edificio.historia.energia, piso, v)
   } else if (sub === 'humo') {
-    if (!edificio.humo[id]) agregarEvento('alarma', `Humo detectado en ${etiquetaZona(id)}`)
-    edificio.humo[id] = v
+    if (!edificio.humo[id]) {
+      agregarEvento('alarma', `Humo detectado en ${etiquetaZona(id)}`)
+      edificio.humo[id] = new Date().toISOString()
+    }
   }
 }
 

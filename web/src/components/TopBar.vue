@@ -2,7 +2,8 @@
 // Barra de eventos: siempre visible, como el "event bar" de los BMS comerciales
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { edificio, etiquetaZona, atenderHumo } from '../lib/mqtt'
+import { edificio, etiquetaZona } from '../lib/mqtt'
+import { useAlarmas } from '../lib/useAlarmas'
 import { oscuro, alternarTema } from '../lib/tema'
 
 defineEmits(['menu'])
@@ -12,7 +13,8 @@ let t
 onMounted(() => { t = setInterval(() => (ahora.value = new Date()), 1000) })
 onUnmounted(() => clearInterval(t))
 
-const titulos = { '/': 'Vista general', '/iluminacion': 'Iluminación', '/usuarios': 'Usuarios y roles' }
+const { atender } = useAlarmas()
+const titulos = { '/': 'Vista general', '/iluminacion': 'Iluminación', '/climatizacion': 'Climatización', '/energia': 'Energía', '/seguridad': 'Seguridad y alarmas', '/accesos': 'Control de accesos', '/usuarios': 'Usuarios y roles' }
 const titulo = computed(() => titulos[route.path] ?? '')
 const alarmas = computed(() => Object.keys(edificio.humo))
 </script>
@@ -25,7 +27,7 @@ const alarmas = computed(() => Object.keys(edificio.humo))
       <span class="h-2 w-2 rounded-full bg-superficie pulso" aria-hidden="true" />
       <span class="font-medium">Humo detectado en {{ etiquetaZona(z) }}.</span>
       <span class="hidden sm:inline text-white/80">Verifica la zona y activa el protocolo de evacuación si se confirma.</span>
-      <button class="ml-auto bg-superficie/15 hover:bg-superficie/25 rounded px-3 py-1 font-medium" @click="atenderHumo(z)">Marcar como atendida</button>
+      <button class="ml-auto bg-white/15 hover:bg-white/25 rounded px-3 py-1 font-medium" @click="atender(z)">Marcar como atendida</button>
     </div>
 
     <div class="h-16 px-4 lg:px-6 flex items-center gap-4">

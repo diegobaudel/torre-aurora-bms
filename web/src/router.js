@@ -5,6 +5,10 @@ const routes = [
   { path: '/login', component: () => import('./views/Login.vue'), meta: { publica: true } },
   { path: '/', component: () => import('./views/Dashboard.vue') },
   { path: '/iluminacion', component: () => import('./views/Iluminacion.vue') },
+  { path: '/climatizacion', component: () => import('./views/Climatizacion.vue') },
+  { path: '/energia', component: () => import('./views/Energia.vue') },
+  { path: '/seguridad', component: () => import('./views/Seguridad.vue') },
+  { path: '/accesos', component: () => import('./views/Accesos.vue'), meta: { roles: ['admin', 'operador', 'recepcion'] } },
   { path: '/usuarios', component: () => import('./views/Usuarios.vue'), meta: { roles: ['admin'] } },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
